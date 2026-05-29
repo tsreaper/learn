@@ -1,26 +1,12 @@
 use crate::hittable::Hittable;
 use crate::ray::Ray;
-use crate::vec3::{Color, Point3, Vec3, random_unit_vector};
-use std::io::{BufWriter, Write, stdout};
+use crate::vec3::{Color, Point3, Vec3};
+use std::sync::atomic::{AtomicI64, Ordering};
 
 pub struct Camera {
     aspect_ratio: f64,
     image_width: i32,
-}
-
-fn linear_to_gamma(x: f64) -> f64 {
-    if x > 0.0 { x.sqrt() } else { 0.0 }
-}
-
-fn write_color(color: &Color, out: &mut impl Write) {
-    let r = linear_to_gamma(color.x());
-    let g = linear_to_gamma(color.y());
-    let b = linear_to_gamma(color.z());
-
-    let ir = (255.999 * r) as i32;
-    let ig = (255.999 * g) as i32;
-    let ib = (255.999 * b) as i32;
-    writeln!(out, "{ir} {ig} {ib}").expect("Failed to write color to stdout");
+    samples_per_pixel: i32,
 }
 
 fn ray_color(ray: &Ray, world: &impl Hittable, depth: i32) -> Color {
@@ -29,7 +15,7 @@ fn ray_color(ray: &Ray, world: &impl Hittable, depth: i32) -> Color {
     }
 
     match world.hit(ray, 0.001, f64::INFINITY) {
-        Some(record) => match record.material().scatter(ray, &record) {
+        Some((record, material)) => match material.scatter(ray, &record) {
             Some((attenuation, scattered)) => attenuation * ray_color(&scattered, world, depth - 1),
             None => Color::new(0.0, 0.0, 0.0),
         },
@@ -42,18 +28,18 @@ fn ray_color(ray: &Ray, world: &impl Hittable, depth: i32) -> Color {
 }
 
 impl Camera {
-    pub fn new(aspect_ratio: f64, image_width: i32) -> Self {
+    pub fn new(aspect_ratio: f64, image_width: i32, samples_per_pixel: i32) -> Self {
         Self {
             aspect_ratio,
             image_width,
+            samples_per_pixel,
         }
     }
 
-    pub fn render(&self, world: &impl Hittable) {
+    pub fn render(&self, world: &impl Hittable, counter: &AtomicI64) -> Vec<Vec<Color>> {
         let aspect_ratio = self.aspect_ratio;
         let image_width = self.image_width;
         let image_height = ((image_width as f64 / aspect_ratio) as i32).max(1);
-        let samples_per_pixel = 100;
         let max_depth = 50;
 
         let focal_length = 1.0;
@@ -71,17 +57,17 @@ impl Camera {
             camera_center - Vec3::new(0.0, 0.0, focal_length) - viewport_u / 2.0 - viewport_v / 2.0;
         let pixel00_loc = viewport_upper_left + 0.5 * pixel_delta_u + 0.5 * pixel_delta_v;
 
-        let mut out = BufWriter::new(stdout());
-        writeln!(out, "P3\n{image_width} {image_height}\n255")
-            .expect("Failed to write header to stdout");
-
+        counter.fetch_add(image_height as i64, Ordering::Relaxed);
+        let mut result: Vec<Vec<Color>> = Vec::new();
         for row in 0..image_height {
-            eprint!("\rScanlines remaining: {}    ", image_height - row);
+            let remaining = counter.fetch_sub(1, Ordering::Relaxed);
+            eprint!("\rScanlines remaining: {remaining}    ");
+            let mut row_result: Vec<Color> = Vec::new();
             for col in 0..image_width {
                 let pixel_center =
                     pixel00_loc + (col as f64 * pixel_delta_u) + (row as f64 * pixel_delta_v);
                 let mut pixel_color = Color::new(0.0, 0.0, 0.0);
-                for _ in 0..samples_per_pixel {
+                for _ in 0..self.samples_per_pixel {
                     let ray_direction = pixel_center
                         + rand::random_range(-0.5..0.5) * pixel_delta_u
                         + rand::random_range(-0.5..0.5) * pixel_delta_v
@@ -89,11 +75,11 @@ impl Camera {
                     let ray = Ray::new(camera_center, ray_direction);
                     pixel_color += ray_color(&ray, world, max_depth);
                 }
-                pixel_color /= samples_per_pixel as f64;
-                write_color(&pixel_color, &mut out);
+                pixel_color /= self.samples_per_pixel as f64;
+                row_result.push(pixel_color);
             }
+            result.push(row_result);
         }
-
-        eprintln!("\rDone.                         ");
+        result
     }
 }

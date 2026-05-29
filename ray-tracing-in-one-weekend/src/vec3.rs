@@ -34,7 +34,7 @@ impl Vec3 {
         self.e.iter().zip(rhs.e).map(|(a, b)| a * b).sum()
     }
 
-    pub fn unit_vector(self) -> Vec3 {
+    pub fn unit_vector(self) -> Self {
         self / self.length()
     }
 
@@ -42,8 +42,15 @@ impl Vec3 {
         self.e.iter().all(|v| v.abs() < 1e-8)
     }
 
-    pub fn reflect(self, normal: Vec3) -> Vec3 {
-        self - 2.0 * self.dot(normal) * normal / normal.length()
+    pub fn reflect(self, normal: Self) -> Self {
+        self - 2.0 * self.dot(normal) * normal
+    }
+
+    pub fn refract(self, normal: Self, relative_refractive_index: f64) -> Self {
+        let cos_theta = -self.dot(normal).min(1.0);
+        let r_out_perp = relative_refractive_index * (self + cos_theta * normal);
+        let r_out_parallel = -(1.0 - r_out_perp.length_squared()).abs().sqrt() * normal;
+        r_out_perp + r_out_parallel
     }
 }
 
@@ -139,11 +146,6 @@ pub fn random_unit_vector() -> Vec3 {
             return vec / lensq.sqrt();
         }
     }
-}
-
-pub fn random_on_hemisphere(normal: Vec3) -> Vec3 {
-    let vec = random_unit_vector();
-    if normal.dot(vec) > 0.0 { vec } else { -vec }
 }
 
 pub type Color = Vec3;
