@@ -1,54 +1,34 @@
-mod vec3;
+mod camera;
+mod hittable;
+mod material;
 mod ray;
+mod vec3;
 
-use vec3::{Vec3, Color, Point3};
-use ray::Ray;
-
-fn write_color(color: &Color) {
-    let ir = (255.999 * color.x()) as i32;
-    let ig = (255.999 * color.y()) as i32;
-    let ib = (255.999 * color.z()) as i32;
-    println!("{} {} {}", ir, ig, ib);
-}
-
-fn ray_color(ray: &Ray) -> Color {
-    let unit_direction = ray.direction().unit_vector();
-    let a = 0.5 * (unit_direction.y() + 1.0);
-    (1.0 - a) * Color::new(1.0, 1.0, 1.0) + a * Color::new(0.5, 0.7, 1.0)
-}
+use camera::Camera;
+use hittable::HittableList;
+use hittable::Sphere;
+use material::{Lambertian, Metal};
+use vec3::{Color, Point3};
 
 fn main() {
-    let aspect_ratio = 16.0 / 9.0;
-    let image_width = 400.0;
-    let image_height = f64::max(1.0, image_width / aspect_ratio);
+    let material_ground = Lambertian::new(Color::new(0.8, 0.8, 0.0));
+    let sphere_ground = Sphere::new(Point3::new(0.0, -100.5, -1.0), 100.0, material_ground);
 
-    let focal_length = 1.0;
-    let viewport_height = 2.0;
-    let viewport_width = viewport_height * image_width / image_height;
-    let camera_center = Point3::new(0.0, 0.0, 0.0);
+    let material_center = Lambertian::new(Color::new(0.1, 0.2, 0.5));
+    let sphere_center = Sphere::new(Point3::new(0.0, 0.0, -1.0), 0.5, material_center);
 
-    let viewport_u = Vec3::new(viewport_width, 0.0, 0.0);
-    let viewport_v = Vec3::new(0.0, -viewport_height, 0.0);
+    let material_left = Metal::new(Color::new(0.8, 0.8, 0.8), 0.3);
+    let sphere_left = Sphere::new(Point3::new(-1.0, 0.0, -1.0), 0.5, material_left);
 
-    let pixel_delta_u = viewport_u / image_width;
-    let pixel_delta_v = viewport_v / image_height;
+    let material_right = Metal::new(Color::new(0.8, 0.6, 0.2), 1.0);
+    let sphere_right = Sphere::new(Point3::new(1.0, 0.0, -1.0), 0.5, material_right);
 
-    let viewport_upper_left = camera_center - Vec3::new(0.0, 0.0, focal_length) - viewport_u / 2.0 - viewport_v / 2.0;
-    let pixel00_loc = viewport_upper_left + 0.5 * pixel_delta_u + 0.5 * pixel_delta_v;
+    let mut world = HittableList::new();
+    world.add(sphere_ground);
+    world.add(sphere_center);
+    world.add(sphere_left);
+    world.add(sphere_right);
 
-    println!("P3\n{} {}\n255", image_width as i32, image_height as i32);
-
-    for i in 0..image_height as u32 {
-        eprint!("\rScanlines remaining: {}    ", image_height as u32 - i);
-        for j in 0..image_width as u32 {
-            let pixel_center = pixel00_loc + (j as f64 * pixel_delta_u) + (i as f64 * pixel_delta_v);
-            let ray_direction = pixel_center - camera_center;
-            let ray = Ray::new(pixel_center, ray_direction);
-
-            let pixel_color = ray_color(&ray);
-            write_color(&pixel_color);
-        }
-    }
-
-    eprintln!("\rDone.                         ",);
+    let camera = Camera::new(16.0 / 9.0, 800);
+    camera.render(&world);
 }
