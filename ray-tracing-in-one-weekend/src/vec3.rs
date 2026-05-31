@@ -34,6 +34,14 @@ impl Vec3 {
         self.e.iter().zip(rhs.e).map(|(a, b)| a * b).sum()
     }
 
+    pub fn cross(self, rhs: Self) -> Self {
+        Self::new(
+            self.e[1] * rhs.e[2] - self.e[2] * rhs.e[1],
+            self.e[2] * rhs.e[0] - self.e[0] * rhs.e[2],
+            self.e[0] * rhs.e[1] - self.e[1] * rhs.e[0],
+        )
+    }
+
     pub fn unit_vector(self) -> Self {
         self / self.length()
     }
@@ -144,6 +152,19 @@ pub fn random_unit_vector() -> Vec3 {
         let lensq = vec.length_squared();
         if 1e-160 < lensq && lensq <= 1.0 {
             return vec / lensq.sqrt();
+        }
+    }
+}
+
+pub fn random_in_unit_disk() -> Vec3 {
+    loop {
+        let vec = Vec3::new(
+            rand::random_range(-1.0..1.0),
+            rand::random_range(-1.0..1.0),
+            0.0,
+        );
+        if vec.length() < 1.0 {
+            return vec;
         }
     }
 }

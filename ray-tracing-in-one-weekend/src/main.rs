@@ -15,7 +15,7 @@ use hittable::Sphere;
 use material::{Dieletric, Lambertian, Metal};
 use rand::rngs::StdRng;
 use rand::{RngExt, SeedableRng};
-use vec3::{Color, Point3};
+use vec3::{Color, Point3, Vec3};
 
 fn linear_to_gamma(x: f64) -> f64 {
     if x > 0.0 { x.sqrt() } else { 0.0 }
@@ -52,12 +52,21 @@ fn render(samples_per_pixel: i32, counter: &AtomicI64) -> Vec<Vec<Color>> {
     let sphere_left_bubble = Sphere::new(Point3::new(-1.0, 0.0, -1.0), 0.4, material_left_bubble);
     world.add(sphere_left_bubble);
 
-    let material_right = Metal::new(Color::new(0.8, 0.6, 0.2), 0.0);
+    let material_right = Metal::new(Color::new(0.8, 0.6, 0.2), 1.0);
     let sphere_right = Sphere::new(Point3::new(1.0, 0.0, -1.0), 0.5, material_right);
     world.add(sphere_right);
 
     let camera = Camera::new(16.0 / 9.0, 800, samples_per_pixel);
-    camera.render(&world, counter)
+    camera.render(
+        &world,
+        20.0,
+        Point3::new(-2.0, 2.0, 1.0),
+        Point3::new(0.0, 0.0, -1.0),
+        Vec3::new(0.0, 1.0, 0.0),
+        10.0,
+        3.4,
+        counter,
+    )
 }
 
 #[allow(dead_code)]
@@ -129,12 +138,21 @@ fn render_large(samples_per_pixel: i32, counter: &AtomicI64) -> Vec<Vec<Color>> 
         Metal::new(Color::new(0.7, 0.6, 0.5), 0.0),
     ));
 
-    let camera = Camera::new(16.0 / 9.0, 400, samples_per_pixel);
-    camera.render(&world, counter)
+    let camera = Camera::new(16.0 / 9.0, 1200, samples_per_pixel);
+    camera.render(
+        &world,
+        20.0,
+        Point3::new(13.0, 2.0, 3.0),
+        Point3::new(0.0, 0.0, 0.0),
+        Vec3::new(0.0, 1.0, 0.0),
+        0.6,
+        10.0,
+        counter,
+    )
 }
 
 fn main() {
-    let total_samples = 100;
+    let total_samples = 1000;
     let parallelism = thread::available_parallelism().map_or(1, |n| n.get());
     let samples_per_pixel = (total_samples / parallelism as i32).max(1);
 
@@ -142,7 +160,7 @@ fn main() {
     let handles: Vec<_> = (0..parallelism)
         .map(|_| {
             let counter = counter.clone();
-            thread::spawn(move || render(samples_per_pixel, &counter))
+            thread::spawn(move || render_large(samples_per_pixel, &counter))
         })
         .collect();
 
