@@ -213,10 +213,10 @@ class Serializer:
         with open(self.path(prefix), "r", encoding=ENCODING) as f:
             serialized = json.load(f)
 
-            serialized_vocab: dict[int, dict[str, str]] = serialized["vocab"]
+            serialized_vocab: dict[str, dict[str, str]] = serialized["vocab"]
             vocab: dict[int, bytes] = {}
             for k, v in serialized_vocab.items():
-                vocab[k] = bytes.fromhex(v["hex"])
+                vocab[int(k)] = bytes.fromhex(v["hex"])
 
             serialized_merges: list[list[str]] = serialized["merges"]
             merges: list[tuple[bytes, bytes]] = []
